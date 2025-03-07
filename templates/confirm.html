@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Split</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='confirm.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Video Splitter</h1>
+            <p>Split your videos into smaller clips effortlessly.</p>
+        </header>
+
+        <div class="confirmation-section">
+            <h2>Confirm Split</h2>
+            <p><strong>Video:</strong> {{ filename }}</p>
+            <p><strong>Total Duration:</strong> {{ duration }} seconds</p>
+            <p><strong>Estimated Time to Split:</strong> {{ estimated_time }}</p>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar">0%</div>
+            </div>
+
+            <button onclick="startSplitting()">Confirm and Start Splitting</button>
+        </div>
+
+        <div class="available-parts" id="available-parts">
+            <h2>Available Parts</h2>
+            <div class="grid-container" id="grid-container">
+                <!-- Parts will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentParts = []; // Track currently displayed parts
+
+        function startSplitting() {
+            // Disable the button to prevent multiple clicks
+            document.querySelector('button').disabled = true;
+
+            // Start polling for progress
+            const progressBar = document.getElementById('progress-bar');
+            const gridContainer = document.getElementById('grid-container');
+            const interval = setInterval(async () => {
+                const response = await fetch('/progress');
+                const data = await response.json();
+
+                // Update progress bar
+                progressBar.style.width = data.percentage + '%';
+                progressBar.textContent = data.percentage + '%';
+
+                // Check for new parts
+                data.available_parts.forEach(part => {
+                    if (!currentParts.includes(part)) {
+                        // Add the new part to the grid
+                        const partDiv = document.createElement('div');
+                        partDiv.className = 'grid-item';
+                        partDiv.innerHTML = `
+                            <div class="thumbnail">
+                                <video controls>
+                                    <source src="/preview/${data.folder}/${part}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                            <div class="details">
+                                <p>${part}</p>
+                                <a href="/download/${data.folder}/${part}" download class="download-btn">Download</a>
+                            </div>
+                        `;
+                        gridContainer.appendChild(partDiv);
+                        currentParts.push(part); // Add to the list of displayed parts
+                    }
+                });
+
+                // If splitting is complete, stop polling
+                if (data.percentage >= 100) {
+                    clearInterval(interval);
+                }
+            }, 1000); // Poll every second
+
+            // Submit the form to start splitting
+            fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `filename={{ filename }}&clip_duration={{ clip_duration }}`
+            });
+        }
+    </script>
+</body>
+</html>
